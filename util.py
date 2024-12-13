@@ -2,6 +2,7 @@ import numpy as np
 import polars as pl
 import torch
 from torch._prims_common import DeviceLikeType
+from torch.cuda import device_count
 from torch.utils.data import Dataset
 from torchmetrics import Accuracy, F1Score, MetricCollection, Precision, Recall
 
@@ -73,13 +74,34 @@ class GameDataset(Dataset):
     def __init__(self, data, device: DeviceLikeType = "cpu"):
         self.user_ids = torch.tensor(data["user_id"].to_numpy(), dtype=torch.int32, device=device)
         self.game_ids = torch.tensor(data["app_id"].to_numpy(), dtype=torch.int32, device=device)
-        self.labels = torch.tensor(data["is_recommended"].to_numpy(), dtype=torch.float32, device=device)
+        self.labels = torch.tensor(data["is_recommended"].to_numpy(), dtype=torch.bool, device=device)
 
     def __len__(self):
         return len(self.user_ids)
 
     def __getitem__(self, idx):
-        return self.user_ids[idx], self.game_ids[idx], self.labels[idx]
+        user_ids = self.user_ids[idx]
+        game_ids = self.game_ids[idx]
+        labels = self.labels[idx]
+        return torch.tensor([user_ids, game_ids]), labels
+
+
+class WeightedGameDataset(Dataset):
+    def __init__(self, data, device: DeviceLikeType = "cpu"):
+        self.user_ids = torch.tensor(data["user_id"].to_numpy(), dtype=torch.int32, device=device)
+        self.game_ids = torch.tensor(data["app_id"].to_numpy(), dtype=torch.int32, device=device)
+        self.weights = torch.tensor(data["playtime_weight"].to_numpy(), dtype=torch.float32, device=device)
+        self.labels = torch.tensor(data["is_recommended"].to_numpy(), dtype=torch.bool, device=device)
+
+    def __len__(self):
+        return len(self.user_ids)
+
+    def __getitem__(self, idx):
+        user_ids = self.user_ids[idx]
+        game_ids = self.game_ids[idx]
+        labels = self.labels[idx]
+        weights = self.labels[idx]
+        return torch.tensor([user_ids, game_ids, weights]), labels
 
 
 def evaluate_model(model, loader, device: DeviceLikeType = "cpu"):
@@ -88,14 +110,15 @@ def evaluate_model(model, loader, device: DeviceLikeType = "cpu"):
     all_labels = []
 
     with torch.no_grad():
-        for user_ids, game_ids, labels in loader:
-            user_ids = user_ids.to(device)
-            game_ids = game_ids.to(device)
-            labels = labels.to(device)
+        for X, y in loader:
+            user_ids, game_ids, _ = X.to(device).T
+            # user_ids = user_ids.to(device)
+            # game_ids = game_ids.to(device)
+            y = y.to(device)
 
             predictions = torch.sigmoid(model(user_ids, game_ids))
             all_predictions.append(predictions.cpu())
-            all_labels.append(labels.cpu())
+            all_labels.append(y.cpu())
 
     all_predictions = torch.cat(all_predictions)
     all_labels = torch.cat(all_labels)
