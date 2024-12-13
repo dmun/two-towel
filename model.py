@@ -11,5 +11,4 @@ class TwoTowerModel(torch.nn.Module):
     def forward(self, user_ids, game_ids):
         user_embeds = self.user_embedding(user_ids)
         game_embeds = self.game_embedding(game_ids)
-        scores = torch.sum(torch.mul(user_embeds, game_embeds), dim=1)
-        return torch.sigmoid(scores)
+        return torch.sum(torch.mul(user_embeds, game_embeds), dim=1)

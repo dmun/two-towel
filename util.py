@@ -70,10 +70,10 @@ def custom_train_test_split(
 
 
 class GameDataset(Dataset):
-    def __init__(self, data):
-        self.user_ids = torch.tensor(data["user_id"].to_numpy(), dtype=torch.long)
-        self.game_ids = torch.tensor(data["app_id"].to_numpy(), dtype=torch.long)
-        self.labels = torch.tensor(data["is_recommended"].to_numpy(), dtype=torch.float32)
+    def __init__(self, data, device: DeviceLikeType = "cpu"):
+        self.user_ids = torch.tensor(data["user_id"].to_numpy(), dtype=torch.int32, device=device)
+        self.game_ids = torch.tensor(data["app_id"].to_numpy(), dtype=torch.int32, device=device)
+        self.labels = torch.tensor(data["is_recommended"].to_numpy(), dtype=torch.float32, device=device)
 
     def __len__(self):
         return len(self.user_ids)
@@ -93,7 +93,7 @@ def evaluate_model(model, loader, device: DeviceLikeType = "cpu"):
             game_ids = game_ids.to(device)
             labels = labels.to(device)
 
-            predictions = model(user_ids, game_ids)
+            predictions = torch.sigmoid(model(user_ids, game_ids))
             all_predictions.append(predictions.cpu())
             all_labels.append(labels.cpu())
 
